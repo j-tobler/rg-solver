@@ -1,0 +1,5 @@
+procedure T2() {
+    assume z == 1;
+    x := 1;
+    z := 0;
+}

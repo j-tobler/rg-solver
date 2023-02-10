@@ -1,0 +1,8 @@
+procedure T1() {
+    r := -5;
+    if (z == 0) {
+        x := 0;
+        r := x;
+    }
+    assert r == 0;
+}
