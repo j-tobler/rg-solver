@@ -62,7 +62,8 @@ grammar = """
     // defined in terms of disjunctions, which are defined in terms of
     // conjunctions, and so on as per the order of operations. Note that
     // quantifiers are not currently supported in the grammar.
-    branch: _IF "(" impl ")" block  // currently not supporting else blocks
+    // The parser does not currently support else blocks.
+    branch: _IF "(" impl ")" block
     assume: _ASSUME impl ";"
     assertion: _ASSERT impl ";"
     

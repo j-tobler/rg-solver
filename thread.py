@@ -10,9 +10,6 @@ class Statement:
     def pretty(self) -> str:
         pass
 
-    def compute_sp(self, pre):
-        pass
-
 
 class Procedure:
     def __init__(self, name: str, block: List[Statement]):
@@ -43,9 +40,8 @@ class Assignment(Statement):
         return str(self.left) + " := " + str(self.right) + ";"
 
     def compute_sp(self, pre):
+        # sp(x := E, P) = exists y :: x == E[x\y] && P[x\y]
         y = FreshSymbol(INT)
-        # for x := E with precondition P:
-        # exists y :: x == E[x\y] && P[x\y]
         first_conjunct = Equals(self.left, self.right.substitute(self.left, y))
         second_conjunct = pre.substitute(self.left, y)
         return Exists([y], And(first_conjunct, second_conjunct))
@@ -60,6 +56,7 @@ class Assumption(Statement):
         return "assume " + str(self.cond) + ";"
 
     def compute_sp(self, pre):
+        # sp(assume E, P) = P && E
         return And(pre, self.cond)
 
 
@@ -72,11 +69,7 @@ class Assertion(Statement):
         return "assert " + str(self.cond) + ";"
 
     def compute_sp(self, pre):
-        # todo: unsure about this
-        #  do asserts even need postconditions in my program structure?
-        #  if correctness is only measured going backwards, the only reason
-        #  asserts would need postconditions is in the case where there's one
-        #  in the middle of a program, or multiple in a line. consider this case
+        # sp(assert E, P) = E ==> P
         return Implies(self.cond, pre)
 
 
@@ -91,10 +84,8 @@ class Conditional(Statement):
         body = body.replace('\n', '\n\t')
         return "if (" + str(self.cond) + ") {" + body + "\n" + "}"
 
-    def compute_sp(self, pre, ):
-        # todo: there is a problem here
-        #  since the sp is defined in terms of the sp of the inner block, it
-        #  needs to be computed first. this raises questions about how sp's will
-        #  be computed over the whole procedure, which data structures will
-        #  be used and generally how the algorithm will be implemented
-        pass
+    def compute_sp(self, pre, block_sp):
+        # sp(if B then S, P) = sp(skip, !B && P) || sp(S, B && P)
+        # = (!B && P) || sp(S, B && P)
+        first_disjunct = And(Not(self.cond), pre)
+        return Or(first_disjunct, block_sp)
