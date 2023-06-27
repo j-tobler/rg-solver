@@ -3,7 +3,7 @@ from thread import *
 
 '''
 Test:
-[ ] Signed integers
+[x] Signed integers
 [ ] Booleans mixed with comparisons
 [ ] Failure of boolean variables
 [ ] True and False literals
@@ -146,5 +146,11 @@ class Transform(Transformer):
 
 
 with open("t1.txt", "r") as reader:
+    obj: Procedure = Lark(grammar, parser='lalr', transformer=Transform()).parse(reader.read()).children[0]
+    print(obj.pretty())
+
+print()
+
+with open("t2.txt", "r") as reader:
     obj: Procedure = Lark(grammar, parser='lalr', transformer=Transform()).parse(reader.read()).children[0]
     print(obj.pretty())

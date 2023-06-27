@@ -60,11 +60,11 @@ todo:
 [ ] re-read notes
 
 parsing plaintext source code >:( (Thursday!)
-[ ] parser grammar implementation
-[ ] using the parser to generate SMT objects from text files
+[x] parser grammar implementation
+[x] using the parser to generate SMT objects from text files
 
 analysing the generated SMT object (Friday)
-[ ] weakest-preconditions and strongest-postconditions
+[...] weakest-preconditions and strongest-postconditions
 [ ] guar and wpg
 [ ] generating basic rely conditions
 

@@ -10,6 +10,9 @@ class Statement:
     def pretty(self) -> str:
         pass
 
+    def compute_sp(self, pre):
+        pass
+
 
 class Procedure:
     def __init__(self, name: str, block: List[Statement]):
@@ -23,8 +26,11 @@ class Procedure:
         return self.name
 
     def pretty(self):
-        return "procedure " + self.name + "() {" + \
-               ("".join(['\n' + s.pretty() for s in self.block])).replace('\n', '\n\t') + "\n}"
+        body = "".join(['\n' + s.pretty() for s in self.block])
+        # indenting the body must be done like this to ensure that newlines
+        # within s.pretty() are also indented
+        body = body.replace('\n', '\n\t')
+        return "procedure " + self.name + "() {" + body + "\n" + "}"
 
 
 class Assignment(Statement):
@@ -36,6 +42,14 @@ class Assignment(Statement):
     def pretty(self):
         return str(self.left) + " := " + str(self.right) + ";"
 
+    def compute_sp(self, pre):
+        y = FreshSymbol(INT)
+        # for x := E with precondition P:
+        # exists y :: x == E[x\y] && P[x\y]
+        first_conjunct = Equals(self.left, self.right.substitute(self.left, y))
+        second_conjunct = pre.substitute(self.left, y)
+        return Exists([y], And(first_conjunct, second_conjunct))
+
 
 class Assumption(Statement):
     def __init__(self, cond):
@@ -44,6 +58,9 @@ class Assumption(Statement):
 
     def pretty(self):
         return "assume " + str(self.cond) + ";"
+
+    def compute_sp(self, pre):
+        return And(pre, self.cond)
 
 
 class Assertion(Statement):
@@ -54,6 +71,14 @@ class Assertion(Statement):
     def pretty(self):
         return "assert " + str(self.cond) + ";"
 
+    def compute_sp(self, pre):
+        # todo: unsure about this
+        #  do asserts even need postconditions in my program structure?
+        #  if correctness is only measured going backwards, the only reason
+        #  asserts would need postconditions is in the case where there's one
+        #  in the middle of a program, or multiple in a line. consider this case
+        return Implies(self.cond, pre)
+
 
 class Conditional(Statement):
     def __init__(self, cond, block: List[Statement]):
@@ -62,5 +87,14 @@ class Conditional(Statement):
         self.block = block
 
     def pretty(self):
-        return "if (" + str(self.cond) + ") {" + \
-               ("".join(['\n' + s.pretty() for s in self.block])).replace('\n', '\n\t') + "\n}"
+        body = "".join(['\n' + s.pretty() for s in self.block])
+        body = body.replace('\n', '\n\t')
+        return "if (" + str(self.cond) + ") {" + body + "\n" + "}"
+
+    def compute_sp(self, pre, ):
+        # todo: there is a problem here
+        #  since the sp is defined in terms of the sp of the inner block, it
+        #  needs to be computed first. this raises questions about how sp's will
+        #  be computed over the whole procedure, which data structures will
+        #  be used and generally how the algorithm will be implemented
+        pass
