@@ -4,8 +4,9 @@ from typing import List
 
 class Statement:
     def __init__(self):
-        self.pre = TRUE
-        self.post = TRUE
+        # To represent the proof outline, every statement stores its
+        # precondition. Initially, all assertions in the proof are false.
+        self.precondition = FALSE()
 
     def pretty(self) -> str:
         pass
@@ -13,19 +14,16 @@ class Statement:
 
 class Procedure:
     def __init__(self, name: str, block: List[Statement]):
-        # for now, specifications are handled with assume and assert statements
         self.name = name
         self.block = block
-        self.requires = TRUE
-        self.ensures = TRUE
 
     def get_name(self):
         return self.name
 
     def pretty(self):
         body = "".join(['\n' + s.pretty() for s in self.block])
-        # indenting the body must be done like this to ensure that newlines
-        # within s.pretty() are also indented
+        # Indenting the body must be done this way to ensure that newlines
+        # within s.pretty() are also indented.
         body = body.replace('\n', '\n\t')
         return "procedure " + self.name + "() {" + body + "\n" + "}"
 
@@ -44,7 +42,8 @@ class Assignment(Statement):
         y = FreshSymbol(INT)
         first_conjunct = Equals(self.left, self.right.substitute(self.left, y))
         second_conjunct = pre.substitute(self.left, y)
-        return Exists([y], And(first_conjunct, second_conjunct))
+        sp = Exists([y], And(first_conjunct, second_conjunct))
+
 
 
 class Assumption(Statement):
