@@ -1,8 +1,19 @@
+precondition: x == 0
+postcondition: true
+globals: x z
+
 procedure T1() {
     r := -5;
     if (z == 0) {
         x := 0;
         r := x;
+    } else {
     }
     assert r == 0;
+}
+
+procedure T2() {
+    assume z == 1;
+    x := 1;
+    z := 0;
 }

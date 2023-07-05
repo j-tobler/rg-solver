@@ -1,84 +1,126 @@
 from pysmt.shortcuts import *
+from parser import *
+from thread import *
+from lark import Lark
+import sys
 
 
-# this probably isn't even necessary
-class RgCondition:
-    def __init__(self):
-        self.conjuncts = []
+def main():
+    if len(sys.argv) != 2:
+        print('Usage: main.py test_file')
+    with open(sys.argv[1], 'r') as reader:
+        # parse target program file
+        lark = Lark(grammar, parser='lalr', transformer=Transform())
+        program = lark.parse(reader.read()).children[0]
+        # extract information from parse results
+        pre = program[0]
+        post = program[1]
+        global_vars = program[2]
+        procedures: list[Procedure] = program[3:]
 
-    def build(self, i=0):
-        if i == len(self.conjuncts):
-            return TRUE
-        if i == len(self.conjuncts) - 1:
-            return self.conjuncts[i]
-        return And(self.conjuncts[1], self.build(i + 1))
+        # print parse results
+        print('=' * 8 + ' PARSE RESULTS ' + '=' * 9)
+        print('pre: ' + str(pre))
+        print('post: ' + str(post))
+        print('globals: ' + str(global_vars))
+        for t in procedures:
+            print()
+            print(t.pretty())
 
-    def print(self):
-        print(self.build())
+        # construct thread objects
+        threads = []
+        thread_count = 1
+        for proc in procedures:
+            threads.append(Thread(thread_count, proc))
+            thread_count += 1
 
+        # initialise cfg node information
 
-# adds a prime to all free variables in the given formula
-# to substitute the primed equivalent of x for y in formula f: f.substitute({primed(x): y})
-def primed(f):
-    return f.substitute({s: Symbol(str(s) + "'", s.get_type()) for s in f.get_free_variables()})
+        global_assigns = get_global_assignments(threads, global_vars)
+        print('=' * 6 + ' GLOBAL ASSIGNMENTS ' + '=' * 6)
+        for key, value in global_assigns.items():
+            print(key.procedure.name + ":")
+            for v in value:
+                print('\t' + v.pretty())
 
+        initialise(threads, global_assigns)
 
-# removes all primes from the given variable
-def unprimed(s):
-    return Symbol(str(s).rstrip("'"), s.get_type())
-
-
-# true iff the given variable is primed
-def is_prime(s):
-    return str(s)[-1] == "'"
-
-
-# extracts all primed variables from the given iterable
-# to extract all free primed variables from a formula: filter_primes(get_free_variables(formula))
-def filter_primes(lst):
-    return set(filter(is_prime, lst))
-
-
-def stable_r(p, r):
-    return Implies(And(p, r), primed(p))
-
-
+        # print parse results
+        print('=' * 8 + ' PARSE RESULTS ' + '=' * 9)
+        print('pre: ' + str(pre))
+        print('post: ' + str(post))
+        print('globals: ' + str(global_vars))
+        for t in procedures:
+            print()
+            print(t.pretty())
 
 
 
+        # allocate node information
 
 
 
-"""
-todo:
-[x] find and replace within formulae
-    find: get_free_variables() - excludes literals and bound variables
-    replace: substitute()
-[x] locating primed variables
-[x] priming and un-priming variables
-[x] stableR
-[ ] re-read notes
 
-parsing plaintext source code >:( (Thursday!)
-[x] parser grammar implementation
-[x] using the parser to generate SMT objects from text files
+def contains_symbol(lst, symbol):
+    contains = False
+    for x in lst:
+        if is_valid(Equals(x, symbol)):
+            contains = True
+    return contains
 
-analysing the generated SMT object (Friday)
-[...] weakest-preconditions and strongest-postconditions
-[ ] guar and wpg
-[ ] generating basic rely conditions
 
-implementing the algorithm (stage 1) (Friday)
-[ ] generating contexts (may require some human input)
-[ ] systematically generating and refining rely conditions for one thread, while storing upper and lower bounds
+def get_global_assignments(threads, global_vars):
+    global_assigns = {}
+    for t in threads:
+        t_global_assigns = []
+        global_assignments_helper(t.procedure, t_global_assigns, global_vars)
+        global_assigns[t] = t_global_assigns
+    return global_assigns
 
-* theory break *
 
-implementing the algorithm (stage 2) (Monday)
-[ ] recursively refining rely conditions for two threads, storing and passing necessary information between calls
-[ ] failure conditions
+def global_assignments_helper(node, global_assigns, global_vars):
+    if isinstance(node, Procedure):
+        for n in node.block:
+            global_assignments_helper(n, global_assigns, global_vars)
+    elif isinstance(node, Conditional):
+        for n in node.true_block:
+            global_assignments_helper(n, global_assigns, global_vars)
+        for n in node.false_block:
+            global_assignments_helper(n, global_assigns, global_vars)
+    elif isinstance(node, Assignment):
+        if contains_symbol(global_vars, node.left):
+            global_assigns.append(node)
 
-* partial prototype complete *
 
-[ ] extending to more than 2 threads?
-"""
+def initialise(threads, global_assigns):
+    for t in threads:
+        pc = 1
+        interfering_assigns = []
+        for other_t, assigns in global_assigns.items():
+            if other_t != t:
+                interfering_assigns.extend(assigns)
+        initialise_helper(t.procedure, pc, interfering_assigns)
+
+
+def initialise_helper(node, init_pc, interfering_assigns):
+    if isinstance(node, Procedure):
+        pc = init_pc
+        for n in node.block:
+            pc = initialise_helper(n, pc, interfering_assigns)
+    elif isinstance(node, Conditional):
+        node.interfering_assignments.update(interfering_assigns)
+        node.pc = init_pc
+        pc = init_pc + 1
+        for n in node.true_block:
+            pc = initialise_helper(n, pc, interfering_assigns)
+        for n in node.false_block:
+            pc = initialise_helper(n, pc, interfering_assigns)
+    else:
+        node.interfering_assignments.update(interfering_assigns)
+        node.pc = init_pc
+        pc = init_pc + 1
+    return pc
+
+
+if __name__ == '__main__':
+    main()

@@ -1,16 +1,9 @@
-from lark import Lark, Transformer
+from lark import Transformer
 from thread import *
 
-'''
-Test:
-[x] Signed integers
-[ ] Booleans mixed with comparisons
-[ ] Failure of boolean variables
-[ ] True and False literals
 
-To add:
-[ ] If and only if
-'''
+# todo:
+# [x] preconditions and postconditions
 
 grammar = """
     // Welcome to Lark!
@@ -24,8 +17,12 @@ grammar = """
     // [if, <condition>, <body>]. This is illustrated in the implementation of
     // Transform.branch() later in the file, which converts this node to a
     // Conditional object, which we define in thread.py.
+    _PRECONDITION: "precondition"
+    _POSTCONDITION: "postcondition"
+    _GLOBALS: "globals"
     _PROCEDURE: "procedure"
     _IF: "if"
+    _ELSE: "else"
     _ASSUME: "assume"
     _ASSERT: "assert"
     PLUS: "+"
@@ -45,25 +42,36 @@ grammar = """
     EQ: "=="
     NE: "!="
 
-    // Initially, Lark tries to match a procedure. Hence, for the moment, we may
-    // only have one procedure per target file.
-    start: procedure
+    // The top-level pattern Lark initially matches.
+    start: program
+    // Here, the * symbol means 0 or more. Lark automatically expands procedure*
+    // to the standard recursive definition in EBNF.
+    program: precondition postcondition globals procedure procedure*
+    
+    // Tokens wrapped in quotations like the colon here are omitted from the
+    // generated AST, just like terminals with underlines.
+    // We use impl here to denote a boolean expression, since an implication is
+    // defined in terms of disjunctions, which are defined in terms of
+    // conjunctions, and so on as per the order of operations. Note that
+    // quantifiers are not currently supported in the grammar.
+    precondition: _PRECONDITION ":" impl
+    postcondition: _POSTCONDITION ":" impl
+    globals: _GLOBALS ":" variable*
+    
     // Procedures do not currently support parameters. The parentheses are just
     // a placeholder. CNAME is a predefined pattern that is imported at the
     // bottom of this grammar.
     procedure: _PROCEDURE CNAME "()" block
+    
     // A block is zero or more of any of these statements.
     block: "{" (assign | branch | assume | assertion)* "}"
     
     // For the moment, variables may only be integers, and hence may only be
     // assigned to arithmetic expressions.
-    assign: CNAME ":=" a_expr ";"
-    // We use impl here to denote a boolean expression, since an implication is
-    // defined in terms of disjunctions, which are defined in terms of
-    // conjunctions, and so on as per the order of operations. Note that
-    // quantifiers are not currently supported in the grammar.
+    assign: variable ":=" a_expr ";"
+    
     // The parser does not currently support else blocks.
-    branch: _IF "(" impl ")" block
+    branch: _IF "(" impl ")" block _ELSE block
     assume: _ASSUME impl ";"
     assertion: _ASSERT impl ";"
     
@@ -108,6 +116,22 @@ class Transform(Transformer):
     name in the (compressed) AST to the custom data types defined in thread.py.
     """
     @staticmethod
+    def program(args):
+        return args
+
+    @staticmethod
+    def precondition(args):
+        return args[0]
+
+    @staticmethod
+    def postcondition(args):
+        return args[0]
+
+    @staticmethod
+    def globals(args):
+        return args
+
+    @staticmethod
     def procedure(args):
         return Procedure(str(args[0]), args[1])
 
@@ -121,7 +145,7 @@ class Transform(Transformer):
 
     @staticmethod
     def branch(args):
-        return Conditional(args[0], args[1])
+        return Conditional(args[0], args[1], args[2])
 
     @staticmethod
     def assume(args):
@@ -153,38 +177,38 @@ class Transform(Transformer):
 
     @staticmethod
     def bool(args):
-        TRUE() if str(args[0]) == "true" else FALSE()
+        return TRUE() if str(args[0]) == 'true' else FALSE()
 
     @staticmethod
     def comp(args):
         op = str(args[1])
-        if op == "<=":
+        if op == '<=':
             return LE(args[0], args[2])
-        if op == "<":
+        if op == '<':
             return LT(args[0], args[2])
-        if op == ">=":
+        if op == '>=':
             return GE(args[0], args[2])
-        if op == ">":
+        if op == '>':
             return GT(args[0], args[2])
-        if op == "==":
+        if op == '==':
             return Equals(args[0], args[2])
-        if op == "!=":
+        if op == '!=':
             return NotEquals(args[0], args[2])
 
     @staticmethod
     def a_expr(args):
         op = str(args[1])
-        if op == "+":
+        if op == '+':
             return Plus(args[0], args[2])
-        if op == "-":
+        if op == '-':
             return Minus(args[0], args[2])
 
     @staticmethod
     def term(args):
         op = str(args[1])
-        if op == "*":
+        if op == '*':
             return Times(args[0], args[2])
-        if op == "/":
+        if op == '/':
             return Div(args[0], args[2])
 
     @staticmethod
@@ -194,14 +218,3 @@ class Transform(Transformer):
     @staticmethod
     def variable(args):
         return Symbol(str(args[0]), INT)
-
-
-with open("t1.txt", "r") as reader:
-    obj: Procedure = Lark(grammar, parser='lalr', transformer=Transform()).parse(reader.read()).children[0]
-    print(obj.pretty())
-
-print()
-
-with open("t2.txt", "r") as reader:
-    obj: Procedure = Lark(grammar, parser='lalr', transformer=Transform()).parse(reader.read()).children[0]
-    print(obj.pretty())
