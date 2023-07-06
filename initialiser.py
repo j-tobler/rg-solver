@@ -72,7 +72,7 @@ def init_reachable_pcs(threads: list[Thread]):
     branch_stack = []
 
     def reachable_pc_initialiser(node):
-        if isinstance(node, Conditional):
+        if isinstance(node, Conditional) and node.false_block:
             max_true_pc = get_last_pc_in_true_block(node)
             max_false_pc = get_last_pc_in_false_block(node)
             first_interval = pc_intervals.pop(0)
@@ -86,14 +86,12 @@ def init_reachable_pcs(threads: list[Thread]):
                 pc_intervals.pop(0)
                 end_of_block = True
             if isinstance(node, Assignment):
-                formula = convert_intervals_to_formula(pc_intervals,
-                                                       thread.pc_symb)
+                formula = intervals_to_formula(pc_intervals, thread.pc_symb)
                 node.reachable_pcs = formula
             if end_of_block and branch_stack:
                 # reached end of true branch
-                if branch_stack:
-                    else_pc = branch_stack.pop()
-                    pc_intervals[0][0] = else_pc
+                else_pc = branch_stack.pop()
+                pc_intervals[0][0] = else_pc
 
     for t in threads:
         thread = t
@@ -167,7 +165,7 @@ def get_last_pc_in_false_block(branch: Conditional):
     return last_stmt.pc
 
 
-def convert_intervals_to_formula(intervals, pc_symbol):
+def intervals_to_formula(intervals, pc_symbol):
     disjuncts = []
     for i in intervals:
         if i[1] == -1:
