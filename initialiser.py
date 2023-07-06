@@ -69,27 +69,44 @@ def init_reachable_pcs(threads: list[Thread]):
     """
     thread = threads[0]
     pc_intervals = [[1, -1]]
+    # Each time the true block of a conditional is entered/exited, this stack
+    # pushes/pops the first PC of the false block. This is necessary for
+    # adding false-block PCs to the set of reachable PCs when the true block
+    # is exited and false block is entered in the recurse_cfg traversal.
     branch_stack = []
 
     def reachable_pc_initialiser(node):
+        # conditionals with empty false-blocks can be treated like regular stmts
         if isinstance(node, Conditional) and node.false_block:
-            max_true_pc = get_last_pc_in_true_block(node)
-            max_false_pc = get_last_pc_in_false_block(node)
+            # PCs of the final statements in the true-block and false-block
+            last_true_block_pc = get_last_pc_in_true_block(node)
+            last_false_block_pc = get_last_pc_in_false_block(node)
+            # upon entering the true-block, we want to split the first interval
             first_interval = pc_intervals.pop(0)
-            pc_intervals.insert(0, [max_false_pc + 1, first_interval[1]])
-            pc_intervals.insert(0, [first_interval[0] + 1, max_true_pc])
-            branch_stack.append(max_true_pc + 1)
+            # split it such to avoid the PCs of the false-block statements
+            pc_intervals.insert(0, [last_false_block_pc + 1, first_interval[1]])
+            pc_intervals.insert(0, [first_interval[0] + 1, last_true_block_pc])
+            # record the first PC of the false-block
+            branch_stack.append(last_true_block_pc + 1)
         else:
+            # we want an exclusive range, so increment the lower bound
             pc_intervals[0][0] += 1
+            # True iff this statement is the last of a true-block of a
+            # conditional with a non-empty false-block, OR is the last statement
+            # of a procedure.
             end_of_block = False
             if pc_intervals[0][0] > pc_intervals[0][1] != -1:
+                # We've reached the end of a block and the first interval is no
+                # longer valid.
                 pc_intervals.pop(0)
                 end_of_block = True
             if isinstance(node, Assignment):
+                # Only assignments record their set of reachable PCs in the CFG.
+                # This set is recorded as a concise logical formula.
                 formula = intervals_to_formula(pc_intervals, thread.pc_symb)
                 node.reachable_pcs = formula
             if end_of_block and branch_stack:
-                # reached end of true branch
+                # since branch_stack != [], we're at the end of a true-block
                 else_pc = branch_stack.pop()
                 pc_intervals[0][0] = else_pc
 
