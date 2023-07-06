@@ -6,8 +6,11 @@ procedure T1() {
     r := -5;
     if (z == 0) {
         x := 0;
-        r := x;
+        x := 1;
+        x := 2;
     } else {
+        x := 3;
+        x := 4;
     }
     assert r == 0;
 }

@@ -21,11 +21,6 @@ class Statement:
         self.interfering_assignments: set[Assignment] = set()
         # program counter of this statement
         self.pc = -1
-        # reachable instructions in the CFG, necessary for auxiliary variables
-        self.reachable_pcs = TRUE()
-
-    def add_interfering_assignment(self, assign):
-        self.interfering_assignments.add(assign)
 
     def regenerate_precondition(self, new_pre):
         """
@@ -89,6 +84,8 @@ class Assignment(Statement):
         self.left = left  # a symbol
         self.right = right  # an arithmetic expression or symbol
         self.local_vars = set()  # the local vars of this assignment's thread
+        # reachable instructions in the CFG, necessary for auxiliary variables
+        self.reachable_pcs = TRUE()
 
     def pretty(self):
         return str(self.pc) + ": " + str(self.left) + " := " + str(self.right) + ";"
