@@ -31,6 +31,14 @@ def recurse_cfg(node, function):
 def init_program_counters(threads: list[Thread]):
     """
     Provides each statement with a unique program counter.
+
+    Technically, for this analysis, only global assignment statements require
+    program counters. This is because PCs are only used when strengthening
+    the image of an interfering transition such to constrain the range of
+    possibly-interfering instructions the environment may execute from that
+    point. Since only global assignments can cause interference, only their PCs
+    will appear in proof outlines and be useful in this purpose of eliminating
+    impossible interference.
     """
     pc = [1]
 

@@ -3,20 +3,47 @@ postcondition: true
 globals: x z
 
 procedure T1() {
-    r := -5;
-    if (z == 0) {
-        x := 0;
-        x := 1;
+    x := 1;
+    if (z == 1) {
         x := 2;
+        if (z == 2) {
+            x := 3;
+            x := 4;
+            if (z == 3) {
+                x := 5;
+                x := 6;
+            } else {
+            }
+            x := 9;
+        } else {
+            x := 10;
+            x := 11;
+        }
+        x := 12;
     } else {
-        x := 3;
-        x := 4;
+        x := 13;
+        if (z == 4) {
+            x := 14;
+            x := 15;
+            if (z == 5) {
+                x := 16;
+                x := 17;
+            } else {
+                x := 18;
+                x := 19;
+            }
+            x := 20;
+        } else {
+            if (z == 6) {
+                x := 22;
+                x := 23;
+            } else {
+            }
+        }
     }
-    assert r == 0;
+    x := 29;
 }
 
 procedure T2() {
-    assume z == 1;
-    x := 1;
-    z := 0;
+    z := 10101;
 }
