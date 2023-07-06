@@ -70,9 +70,7 @@ def init_reachable_pcs(threads: list[Thread]):
             first_interval = pc_intervals.pop(0)
             pc_intervals.insert(0, [max_false_pc + 1, first_interval[1]])
             pc_intervals.insert(0, [first_interval[0] + 1, max_true_pc])
-            branch_stack.append(None)
-            if node.false_block:
-                branch_stack.append([max_true_pc + 1, first_interval[1]])
+            branch_stack.append(max_true_pc + 1)
         else:
             pc_intervals[0][0] += 1
             end_of_block = False
@@ -84,9 +82,10 @@ def init_reachable_pcs(threads: list[Thread]):
                                                        thread.pc_symb)
                 node.reachable_pcs = formula
             if end_of_block and branch_stack:
-                e = branch_stack.pop()
-                if e:
-                    pc_intervals.insert(0, e)
+                # reached end of true branch
+                if branch_stack:
+                    else_pc = branch_stack.pop()
+                    pc_intervals[0][0] = else_pc
 
     for t in threads:
         thread = t
@@ -192,39 +191,23 @@ def print_info(threads: list[Thread]):
     def print_node_info(node):
         if isinstance(node, Conditional):
             print('Conditional:')
-            print(node.pretty())
-            print('PC = ' + str(node.pc))
-            interfering_assigns = [i.pretty() for i in
-                                   node.interfering_assignments]
-            print('Interfering Assignments = ' + str(interfering_assigns))
-            print()
         elif isinstance(node, Assertion):
             print('Assertion:')
-            print(node.pretty())
-            print('PC = ' + str(node.pc))
-            interfering_assigns = [i.pretty() for i in
-                                   node.interfering_assignments]
-            print('Interfering Assignments = ' + str(interfering_assigns))
-            print()
         elif isinstance(node, Assumption):
             print('Assumption:')
-            print(node.pretty())
-            print('PC = ' + str(node.pc))
-            interfering_assigns = [i.pretty() for i in
-                                   node.interfering_assignments]
-            print('Interfering Assignments = ' + str(interfering_assigns))
-            print()
         elif isinstance(node, Assignment):
             print('Assignment:')
-            print(node.pretty())
-            print('PC = ' + str(node.pc))
-            interfering_assigns = [i.pretty() for i in
-                                   node.interfering_assignments]
-            print('Interfering Assignments = ' + str(interfering_assigns))
-            print('Reachable PCs = ' + str(node.reachable_pcs))
-            print()
         else:
             exit('Unknown Statements')
+        print(node.pretty())
+        print('PC = ' + str(node.pc))
+        interfering_assigns = [i.pretty() for i in
+                               node.interfering_assignments]
+        print('Interfering Assignments = ' + str(interfering_assigns))
+        if isinstance(node, Assignment):
+            print('Reachable PCs = ' + str(node.reachable_pcs))
+        print()
+
 
     for t in threads:
         recurse_cfg(t.procedure, print_node_info)
