@@ -57,7 +57,7 @@ def main():
         print()
         print(t.procedure.pretty_proof())
     print()
-    print('Derived Postcondition: ' + str(simplify(program_post)))
+    print('Derived Postcondition: ' + str(simplify(program_post).serialize()))
     print()
     if is_sat(And(program_post, Not(post))):
         print('Verification Unsuccessful.')

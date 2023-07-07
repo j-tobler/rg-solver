@@ -107,7 +107,7 @@ class Assignment(Statement):
         y = FreshSymbol(INT)
         body = And(Equals(self.left, self.right.substitute({self.left: y})),
                    self.pre.substitute({self.left: y}))
-        eliminated = qelim(Exists([y], body), 'z3')
+        eliminated = simplify(qelim(Exists([y], simplify(body)), 'z3'))
         assert not eliminated.is_quantifier()
         return eliminated
 
@@ -124,8 +124,8 @@ class Assignment(Statement):
         body = And([Equals(self.left, self.right.substitute({self.left: y})),
                     And(self.pre, env_pred).substitute({self.left: y}),
                     Equals(pc_symb, Int(self.pc))])
-        existential = Exists(quantified_vars, body)
-        eliminated = qelim(existential, 'z3')
+        existential = Exists(quantified_vars, simplify(body))
+        eliminated = simplify(qelim(existential, 'z3'))
         assert not eliminated.is_quantifier()
         return And(eliminated, self.reachable_pcs)
 
@@ -157,7 +157,7 @@ class Assertion(Statement):
         """
         sp(assert E, P) = E ==> P
         """
-        return Implies(self.cond, self.pre)
+        return simplify(Implies(self.cond, self.pre))
 
 
 class Conditional(Statement):
