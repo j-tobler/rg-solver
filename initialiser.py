@@ -7,13 +7,16 @@ def initialise(threads: list[Thread], global_vars):
     init_reachable_pcs(threads)
     global_assigns = init_global_assignments(threads, global_vars)
     init_interfering_assignments(threads, global_assigns)
-
-    print_info(threads)
+    init_owner_thread(threads)
+    init_local_vars(threads, global_vars)
+    # print_info(threads)
 
 
 def recurse_cfg(node, function):
     """
-    Applies the given function to all statements in this cfg.
+    Applies the given function to all statements in this CFG.
+    This function is used liberally throughout this file to apply particular
+    initialisation procedures to all statements in the CFG in this order.
     """
     if isinstance(node, Procedure):
         for stmt in node.block:
@@ -157,6 +160,45 @@ def init_interfering_assignments(threads: list[Thread], global_assigns):
             if t2 != t:
                 interfering_assigns.extend(assigns)
         recurse_cfg(t.procedure, interfering_assignments_initialiser)
+
+
+def init_owner_thread(threads: list[Thread]):
+    """
+    Provides each statement with the thread it is in.
+    """
+    def owner_thread_initialiser(node):
+        node.thread = t
+
+    for t in threads:
+        recurse_cfg(t.procedure, owner_thread_initialiser)
+
+
+def init_local_vars(threads: list[Thread], global_vars):
+
+    def get_vars(node):
+        if isinstance(node, Assignment):
+            vars_used.add(node.left)
+            vars_used.update(set(get_free_variables(node.right)))
+        else:
+            vars_used.update(set(get_free_variables(node.cond)))
+
+    for t in threads:
+        vars_used = set()
+        recurse_cfg(t.procedure, get_vars)
+        is_local = lambda x: not symbol_in(x, global_vars)
+        t.local_vars = set(filter(is_local, vars_used))
+
+    duplicate = None
+    for t in threads:
+        for t_other in threads:
+            if t == t_other:
+                continue
+            for v in t.local_vars:
+                if symbol_in(v, t_other.local_vars):
+                    duplicate = v
+    if duplicate:
+        exit(f'Error: Duplicate local variable: {str(duplicate)}.\n'
+             f'Local variables must be distinct.')
 
 # ======================= Helper Functions =======================
 

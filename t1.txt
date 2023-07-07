@@ -1,49 +1,12 @@
 precondition: x == 0
-postcondition: true
+postcondition: x == 3 && z == 3
 globals: x z
 
 procedure T1() {
-    x := 1;
-    if (z == 1) {
-        x := 3;
-        if (z == 2) {
-            x := 5;
-            x := 6;
-            if (z == 3) {
-                x := 8;
-                x := 9;
-            } else {
-            }
-            x := 10;
-        } else {
-            x := 11;
-            x := 12;
-        }
-        x := 13;
-    } else {
-        x := 14;
-        if (z == 4) {
-            x := 16;
-            x := 17;
-            if (z == 5) {
-                x := 19;
-                x := 20;
-            } else {
-                x := 21;
-                x := 22;
-            }
-            x := 23;
-        } else {
-            if (z == 6) {
-                x := 25;
-                x := 26;
-            } else {
-            }
-        }
-    }
-    x := 27;
+    x := 2;
+    x := 3;
 }
 
 procedure T2() {
-    z := 10101;
+    z := 3;
 }

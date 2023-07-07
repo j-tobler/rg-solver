@@ -7,6 +7,13 @@ class Thread:
         self.pc_symb = Symbol('pc_' + str(t_id), INT)
         # root procedure
         self.procedure = procedure
+        # true iff the thread has reached a fixpoint
+        self.fixpoint_reached = False
+        # the set of local variables of this thread
+        self.local_vars = set()
+
+    def stable_sp_proof(self, pre):
+        self.procedure.stable_sp_proof(pre)
 
 
 class Statement:
@@ -21,16 +28,20 @@ class Statement:
         self.interfering_assignments: set[Assignment] = set()
         # program counter of this statement
         self.pc = -1
+        # the thread this statement is in
+        self.thread = None
 
     def regenerate_precondition(self, new_pre):
         """
         When regenerating a proof, each node performs the following steps:
         1. Receive a new precondition from the previous node.
-        2. Replace the current precondition with the new one, if the new one is
-        weaker.
-        3. Stabilise the precondition.
-        4. If the precondition has been updated by (2) or (3), recompute the
-        postcondition.
+           (This will be simple first-order predicate.)
+        2. If the new precondition is weaker, replace the current one with it.
+        3. If it is unstable, replace it with its stabilisation.
+           (The returned stabilisation should also be a first-order predicate.
+           In this method, checking stability requires quantifier elimination.)
+        4. If it has been updated by (2) or (3), recompute the postcondition.
+           (Eliminate quantifiers before returning post.)
         5: Pass this postcondition to the next node.
         """
         updated_pre = False
@@ -68,6 +79,9 @@ class Procedure:
         self.name = name
         self.block = block
         self.eof = Eof()
+
+    def stable_sp_proof(self, pre):
+        pass
 
     def get_name(self):
         return self.name
