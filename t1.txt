@@ -1,16 +1,11 @@
-precondition: true
-postcondition: r == 0
-globals: x z
+precondition: x == 0
+postcondition: x == 4
+globals: x
 
 procedure T1() {
-    r := 0;
-    if (z == 0) {
-        x := 0;
-        r := x;
-    } else {}
+    x := x + 2;
 }
 
 procedure T2() {
-    assume z == 1;
-    x := 1;
+    x := x + 2;
 }
