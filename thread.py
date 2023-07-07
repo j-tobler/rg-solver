@@ -8,12 +8,16 @@ class Thread:
         # root procedure
         self.procedure = procedure
         # true iff the thread has reached a fixpoint
+        # A fixpoint for the thread is reached when the preconditions of all its
+        # global assignments reach a fixpoint. For now however, for ease of
+        # implementation, we check all statements except conditionals.
         self.fixpoint_reached = False
         # the set of local variables of this thread
         self.local_vars = set()
 
     def stable_sp_proof(self, pre):
-        self.procedure.stable_sp_proof(pre)
+        self.fixpoint_reached = True
+        return self.procedure.regenerate_proof(pre)
 
 
 class Statement:
@@ -31,41 +35,30 @@ class Statement:
         # the thread this statement is in
         self.thread = None
 
-    def regenerate_precondition(self, new_pre):
-        """
-        When regenerating a proof, each node performs the following steps:
-        1. Receive a new precondition from the previous node.
-           (This will be simple first-order predicate.)
-        2. If the new precondition is weaker, replace the current one with it.
-        3. If it is unstable, replace it with its stabilisation.
-           (The returned stabilisation should also be a first-order predicate.
-           In this method, checking stability requires quantifier elimination.)
-        4. If it has been updated by (2) or (3), recompute the postcondition.
-           (Eliminate quantifiers before returning post.)
-        5: Pass this postcondition to the next node.
-        """
+    def regenerate_proof(self, pre):
         updated_pre = False
         # first, check if the given precondition is weaker than the current one
-        if is_sat(And(new_pre, Not(self.pre))):
+        if is_sat(And(pre, Not(self.pre))):
             # new precondition contains states not captured by old precondition
             # since assertions are only weakened, we should have old ==> new
-            assert not is_sat(And(self.pre, Not(new_pre)))
-            self.pre = new_pre
+            assert not is_sat(And(self.pre, Not(pre)))
+            self.pre = pre
             updated_pre = True
         # now check stability
         for assign in self.interfering_assignments:
-            post = assign.compute_sp_interfere(self.pre)
-            if is_sat(And(..., Not(self.pre))):
+            image = assign.compute_sp_interfere(self.pre)
+            if is_sat(And(image, Not(self.pre))):
                 # precondition is unstable - stabilise it
-                image = ...
+                self.pre = Or(self.pre, image)
+                updated_pre = True
+        # return the cached postcondition if the precondition hasn't changed
         if updated_pre:
-            # update post
-            # involves eliminating quantifiers
-            ...
+            self.post = self.compute_sp()
+            self.thread.fixpoint_reached = False
         return self.post
 
-    def compute_sp(self, pre):
-        pass
+    def compute_sp(self):
+        return self.pre
 
     def pretty(self) -> str:
         return ""
@@ -80,14 +73,18 @@ class Procedure:
         self.block = block
         self.eof = Eof()
 
-    def stable_sp_proof(self, pre):
-        pass
-
-    def get_name(self):
-        return self.name
+    def regenerate_proof(self, pre):
+        for stmt in self.block:
+            pre = stmt.regenerate_proof(pre)
+        return self.eof.regenerate_proof(pre)
 
     def pretty(self):
         body = "".join(['\n' + s.pretty() for s in self.block])
+        body = body.replace('\n', '\n' + ' ' * 4)
+        return "procedure " + self.name + "() {" + body + "\n" + "}"
+
+    def pretty_proof(self):
+        body = "".join(['\n' + s.pretty_proof() for s in self.block + [self.eof]])
         body = body.replace('\n', '\n' + ' ' * 4)
         return "procedure " + self.name + "() {" + body + "\n" + "}"
 
@@ -103,24 +100,24 @@ class Assignment(Statement):
     def pretty(self):
         return str(self.pc) + ": " + str(self.left) + " := " + str(self.right) + ";"
 
-    def compute_sp(self, pre):
-
-
-
-        # sp(x := E, P) = sp(x := E, pc := k) where k is the pc of this stmt
-        # = exists y, z :: x == E[x\y] && pc == k && P[x\y, pc\z]
+    def compute_sp(self):
+        """
+        sp(x := E, P) = exists y :: x == E[x <- y] && P[x <- y]
+        """
         y = FreshSymbol(INT)
-        z = FreshSymbol(INT)
-        first_conjunct = Equals(self.left, self.right.substitute(self.left, y))
-        second_conjunct = Equals(self.pc_symb, )
-        third_conjunct = pre.substitute({self.left: y, self.pc_symb: z})
-        return Exists([y], And(first_conjunct, second_conjunct))
+        body = And(Equals(self.left, self.right.substitute({self.left: y})),
+                   self.pre.substitute({self.left: y}))
+        eliminated = qelim(Exists([y], body), 'z3')
+        assert not eliminated.is_quantifier()
+        return eliminated
 
     def compute_sp_interfere(self, env_pred):
-        # Where P = pre, Q = env_pred, L = thread.local_vars, R = reachable_pcs,
-        # A = P && Q, k = self.pc, pc = thread.pc_symb, and y is fresh:
-        # sp_interfere(x := E, A)
-        # = (exists y, L, pc :: x == E[x\y] && A[x\y] && pc == k) && R
+        """
+        Where P = pre, Q = env_pred, L = thread.local_vars, R = reachable_pcs,
+        A = P && Q, k = self.pc, pc = thread.pc_symb, and y is fresh:
+        sp_interfere(x := E, A)
+        = (exists y, L, pc :: x == E[x <- y] && A[x <- y] && pc == k) && R
+        """
         pc_symb = self.thread.pc_symb
         y = FreshSymbol(INT)
         quantified_vars = [y] + list(self.thread.local_vars) + [pc_symb]
@@ -129,7 +126,7 @@ class Assignment(Statement):
                     Equals(pc_symb, Int(self.pc))])
         existential = Exists(quantified_vars, body)
         eliminated = qelim(existential, 'z3')
-        assert eliminated.is_quantifier()
+        assert not eliminated.is_quantifier()
         return And(eliminated, self.reachable_pcs)
 
 
@@ -141,9 +138,11 @@ class Assumption(Statement):
     def pretty(self):
         return str(self.pc) + ": " + "assume " + str(self.cond) + ";"
 
-    def compute_sp(self, pre):
-        # sp(assume E, P) = P && E
-        return And(pre, self.cond)
+    def compute_sp(self):
+        """
+        sp(assume E, P) = P && E
+        """
+        return And(self.pre, self.cond)
 
 
 class Assertion(Statement):
@@ -154,9 +153,11 @@ class Assertion(Statement):
     def pretty(self):
         return str(self.pc) + ": " + "assert " + str(self.cond) + ";"
 
-    def compute_sp(self, pre):
-        # sp(assert E, P) = E ==> P
-        return Implies(self.cond, pre)
+    def compute_sp(self):
+        """
+        sp(assert E, P) = E ==> P
+        """
+        return Implies(self.cond, self.pre)
 
 
 class Conditional(Statement):
@@ -166,6 +167,38 @@ class Conditional(Statement):
         self.cond = cond
         self.true_block = true_block
         self.false_block = false_block
+        self.true_block_post = FALSE()
+        self.false_block_post = FALSE()
+
+    def regenerate_proof(self, pre):
+        # first, check if the given precondition is weaker than the current one
+        if is_sat(And(pre, Not(self.pre))):
+            # new precondition contains states not captured by old precondition
+            # since assertions are only weakened, we should have old ==> new
+            assert not is_sat(And(self.pre, Not(pre)))
+            self.pre = pre
+        # now check stability
+        for assign in self.interfering_assignments:
+            image = assign.compute_sp_interfere(self.pre)
+            if is_sat(And(image, Not(self.pre))):
+                # precondition is unstable - stabilise it
+                self.pre = Or(self.pre, image)
+        # regenerate proofs for the blocks
+        true_post = And(self.pre, self.cond)
+        for stmt in self.true_block:
+            true_post = stmt.regenerate_proof(true_post)
+        false_post = And(self.pre, Not(self.cond))
+        for stmt in self.false_block:
+            false_post = stmt.regenerate_proof(false_post)
+        self.true_block_post = true_post
+        self.false_block_post = false_post
+        # Since we don't know if the pre of a statement within a block changed
+        # without doing comparisons between true_block and self.true_block_post,
+        # we always update self.post here and assert it is weaker than before.
+        post = self.compute_sp()
+        assert not is_sat(And(self.post, Not(post)))
+        self.post = post
+        return self.post
 
     def pretty(self):
         true_body = "".join(['\n' + s.pretty() for s in self.true_block])
@@ -178,13 +211,31 @@ class Conditional(Statement):
         whole_statement = whole_statement.replace('\n', '\n' + ' ' * len(pc))
         return whole_statement
 
-    def compute_sp(self, pre, block_sp):
-        # sp(if B then S, P) = sp(skip, !B && P) || sp(S, B && P)
-        # = (!B && P) || sp(S, B && P)
-        first_disjunct = And(Not(self.cond), pre)
-        return Or(first_disjunct, block_sp)
+    def pretty_proof(self):
+        true_body = "".join(['\n' + s.pretty_proof() for s in self.true_block])
+        true_body = true_body.replace('\n', '\n' + ' ' * 4)
+        false_body = "".join(['\n' + s.pretty_proof() for s in self.false_block])
+        false_body = false_body.replace('\n', '\n' + ' ' * 4)
+        pc = str(self.pc) + ": "
+        whole_statement = pc + "if (" + str(self.cond) + ") {" + true_body + \
+                          "\n} else {" + false_body + "\n}"
+        whole_statement = whole_statement.replace('\n', '\n' + ' ' * len(pc))
+        return '{' + str(self.pre) + '}' + '\n' + whole_statement
+
+    def compute_sp(self):
+        """
+        sp(if B then S1 else S2, P)
+            = sp(S1, B && P) || sp(S2, !B && P)
+        where:
+            sp(S1, B && P) = true_block_post
+            sp(S2, !B && P) = false_block_post
+        """
+        return Or(self.true_block_post, self.false_block_post)
 
 
 class Eof(Statement):
     def __init__(self):
         super().__init__()
+
+    def pretty(self) -> str:
+        return "E"

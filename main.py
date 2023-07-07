@@ -42,7 +42,52 @@ def main():
     initialise(threads, global_vars)
 
     # todo: perform analysis
+    # perform one iteration and print results
+    fixpoint_reached = False
+    while not fixpoint_reached:
+        fixpoint_reached = True
+        for t in threads:
+            t.stable_sp_proof(pre)
+            if not t.fixpoint_reached:
+                fixpoint_reached = False
+    local_posts = [t.procedure.eof.pre for t in threads]
+    program_post = And(local_posts)
 
+    for t in threads:
+        print()
+        print(t.procedure.pretty_proof())
+    print()
+    print('Derived Postcondition: ' + str(simplify(program_post)))
+    print()
+    if is_sat(And(program_post, Not(post))):
+        print('Verification Unsuccessful.')
+    else:
+        print('Verification Successful!')
+
+    """
+    Problem
+    
+    The current algorithm disjunctively merges images from interference to
+    unstable assertions. This means we can't verify cases like mutual increment,
+    where the postcondition cannot be satisfied by any thread in isolation.
+    
+    To improve completeness, we cannot directly disjoin images. We need to do a
+    refinement like:
+    (pc <= k ==> Q) && (pc > k ==> img)
+    However, this may affect soundness or efficiency. For example, the env may
+    be able to transition from pc <= k to !img under a different precondition
+    than Q. This needs more investigation.
+    
+    In general, this code needs to be significantly cleaned up, simplified and
+    documented. Generated predicates need to be simplified on the fly to ease
+    existential elimination. In future, we may aid this elimination further by
+    strategically distributing the existential over its disjuncts in DNF, or
+    a similar divide-and-conquer strategy. We must also find a way to add a knob
+    to the level of the abstraction used in deriving interference images. There
+    is also plenty of room for optimisation in many of the subroutines contained
+    in this algorithm. For example, a lot of objects store data they don't need
+    to.
+    """
 
 
 if __name__ == '__main__':

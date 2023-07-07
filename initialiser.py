@@ -177,6 +177,8 @@ def init_owner_thread(threads: list[Thread]):
 
     for t in threads:
         recurse_cfg(t.procedure, owner_thread_initialiser)
+        # a bit of a bodge - for now, EOF statements also need owner threads
+        t.procedure.eof.thread = t
 
 
 def init_local_vars(threads: list[Thread], global_vars):
