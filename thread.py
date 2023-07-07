@@ -54,7 +54,7 @@ class Statement:
             updated_pre = True
         # now check stability
         for assign in self.interfering_assignments:
-
+            post = assign.compute_sp_interfere(self.pre)
             if is_sat(And(..., Not(self.pre))):
                 # precondition is unstable - stabilise it
                 image = ...
@@ -97,7 +97,6 @@ class Assignment(Statement):
         super().__init__()
         self.left = left  # a symbol
         self.right = right  # an arithmetic expression or symbol
-        self.local_vars = set()  # the local vars of this assignment's thread
         # reachable instructions in the CFG, necessary for auxiliary variables
         self.reachable_pcs = TRUE()
 
@@ -105,6 +104,9 @@ class Assignment(Statement):
         return str(self.pc) + ": " + str(self.left) + " := " + str(self.right) + ";"
 
     def compute_sp(self, pre):
+
+
+
         # sp(x := E, P) = sp(x := E, pc := k) where k is the pc of this stmt
         # = exists y, z :: x == E[x\y] && pc == k && P[x\y, pc\z]
         y = FreshSymbol(INT)
@@ -114,19 +116,21 @@ class Assignment(Statement):
         third_conjunct = pre.substitute({self.left: y, self.pc_symb: z})
         return Exists([y], And(first_conjunct, second_conjunct))
 
-    def compute_sp_interfere(self, pre):
-        # sp_interfere(x := E, P)
-        # = exists y, z, L :: x == E[x\y] && pc in R && P[x\y, pc\z]
-        # where:
-        #     k is the pc of this assignment statement
-        #     R is the set of reachable PCs in the CFG, including k
-        #     L is the set of local variables of this thread, excluding pc
+    def compute_sp_interfere(self, env_pred):
+        # Where P = pre, Q = env_pred, L = thread.local_vars, R = reachable_pcs,
+        # A = P && Q, k = self.pc, pc = thread.pc_symb, and y is fresh:
+        # sp_interfere(x := E, A)
+        # = (exists y, L, pc :: x == E[x\y] && A[x\y] && pc == k) && R
+        pc_symb = self.thread.pc_symb
         y = FreshSymbol(INT)
-        quantified_vars = [y] + list(self.local_vars)
-        first_conjunct = Equals(self.left, self.right.substitute(self.left, y))
-        second_conjunct = pre.substitute(self.left, y)
-        third_conjunct = ...
-        pass
+        quantified_vars = [y] + list(self.thread.local_vars) + [pc_symb]
+        body = And([Equals(self.left, self.right.substitute({self.left: y})),
+                    And(self.pre, env_pred).substitute({self.left: y}),
+                    Equals(pc_symb, Int(self.pc))])
+        existential = Exists(quantified_vars, body)
+        eliminated = qelim(existential, 'z3')
+        assert eliminated.is_quantifier()
+        return And(eliminated, self.reachable_pcs)
 
 
 class Assumption(Statement):

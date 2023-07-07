@@ -3,12 +3,18 @@ from thread import *
 
 
 def initialise(threads: list[Thread], global_vars):
+    """
+    fixme:
+    I might have used sets somewhere to enforce uniqueness on symbols. This
+    won't work because the same symbols can be represented as different objects.
+    """
     init_program_counters(threads)
     init_reachable_pcs(threads)
     global_assigns = init_global_assignments(threads, global_vars)
     init_interfering_assignments(threads, global_assigns)
     init_owner_thread(threads)
     init_local_vars(threads, global_vars)
+    verify_variable_names(threads, global_vars)
     # print_info(threads)
 
 
@@ -199,6 +205,22 @@ def init_local_vars(threads: list[Thread], global_vars):
     if duplicate:
         exit(f'Error: Duplicate local variable: {str(duplicate)}.\n'
              f'Local variables must be distinct.')
+
+
+def verify_variable_names(threads: list[Thread], global_vars):
+    illegal_prefixes = ['pc']
+    variables = []
+    variables.extend(global_vars)
+    for t in threads:
+        variables.extend(t.local_vars)
+    illegal_vars = False
+    for v in variables:
+        for s in illegal_prefixes:
+            if str(v).startswith(s):
+                print(f'Variable {str(v)} has an illegal name.')
+                illegal_vars = True
+    if illegal_vars:
+        exit('Error: Discovered a variable with an illegal name.')
 
 # ======================= Helper Functions =======================
 
