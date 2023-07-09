@@ -158,15 +158,19 @@ class Procedure:
         lines_with_pcs = []
         pc = 1
         for line in lines:
-            pc_segment = ''
+            pc_segment = '| '
             if '}' not in line:
-                pc_segment = str(pc) + ': '
+                pc_segment = str(pc) + pc_segment
                 pc += 1
-            pc_segment += ' ' * (std_length - len(pc_segment))
+            pc_segment = ' ' * (std_length - len(pc_segment)) + pc_segment
             lines_with_pcs.append('\n' + pc_segment + line)
         body = ''.join(s for s in lines_with_pcs)
-        return ' ' * std_length + str(self) + ' {' + body + '\n' + \
-               ' ' * std_length + '}' + '\n'
+        proof_str = ' ' * std_length + str(self) + ' {' + body
+        if annotations:
+            proof_str += '\n' + ' ' * (std_length - 2) + '| '
+            proof_str += ' ' * INDENT + '{' + str(self.eof.pre) + '}'
+        proof_str += '\n' + ' ' * std_length + '}' + '\n'
+        return proof_str
 
 
 class Assignment(Statement):
@@ -253,28 +257,6 @@ class Conditional(Statement):
     def update_block_postconditions(self, true_block_post, false_block_post):
         self.true_block_post = true_block_post
         self.false_block_post = false_block_post
-
-    def regenerate_proof(self, pre):
-        # first, check if the given precondition is weaker than the current one
-        if is_sat(And(pre, Not(self.pre))):
-            # new precondition contains states not captured by old precondition
-            # since assertions are only weakened, we should have old ==> new
-            assert not is_sat(And(self.pre, Not(pre)))
-            self.pre = pre
-        # now check stability
-        for assign in self.thread.interfering_assignments:
-            image = assign.compute_sp_interfere(self.pre)
-            if is_sat(And(image, Not(self.pre))):
-                # precondition is unstable - stabilise it
-                self.pre = Or(self.pre, image)
-
-        # Since we don't know if the pre of a statement within a block changed
-        # without doing comparisons between true_block and self.true_block_post,
-        # we always update self.post here and assert it is weaker than before.
-        post = self.compute_sp()
-        assert not is_sat(And(self.post, Not(post)))
-        self.post = post
-        return self.post
 
     def __str__(self):
         return "if (" + str(self.cond) + ")"

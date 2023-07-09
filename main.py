@@ -2,6 +2,7 @@ from parser import *
 from thread import *
 from lark import Lark
 import sys
+from colorama import Fore
 
 
 def main():
@@ -50,9 +51,9 @@ def main():
     print('Derived Postcondition: ' + str(simplify(program_post).serialize()))
     print()
     if is_sat(And(program_post, Not(specified_postcondition))):
-        print('Verification Unsuccessful.')
+        print(f'{Fore.RED}Verification Unsuccessful.{Fore.RESET}')
     else:
-        print('Verification Successful!')
+        print(f'{Fore.GREEN}Verification Successful!{Fore.RESET}')
 
     """
     Problem

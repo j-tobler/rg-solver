@@ -1,0 +1,23 @@
+precondition: true
+postcondition: r == 0
+globals: x z
+
+procedure T1() {
+    r := 0;
+    if (z == 0) {
+        x := 0;
+        r := x;
+    } else {}
+    r := 0;
+    r := 0;
+    r := 0;
+    r := 0;
+    r := 0;
+    r := 0;
+    r := 0;
+}
+
+procedure T2() {
+    assume z == 1;
+    x := 1;
+}
