@@ -2,9 +2,6 @@ from lark import Transformer
 from thread import *
 
 
-# todo:
-# [x] preconditions and postconditions
-
 grammar = """
     // Welcome to Lark!
     // Lark builds an AST using the following grammar. I'll provide some brief
@@ -115,6 +112,10 @@ class Transform(Transformer):
     The transformer contains a set of methods for converting nodes of the same
     name in the (compressed) AST to the custom data types defined in thread.py.
     """
+    def __init__(self):
+        super().__init__()
+        self.t_id = 0
+
     @staticmethod
     def program(args):
         return args
@@ -131,9 +132,9 @@ class Transform(Transformer):
     def globals(args):
         return args
 
-    @staticmethod
-    def procedure(args):
-        return Procedure(str(args[0]), args[1])
+    def procedure(self, args):
+        self.t_id += 1
+        return Procedure(str(args[0]), self.t_id, args[1])
 
     @staticmethod
     def block(args):
