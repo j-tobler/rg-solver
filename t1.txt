@@ -1,11 +1,11 @@
 precondition: x == 0
-postcondition: x == 4
+postcondition: x == 2
 globals: x
 
 procedure T1() {
-    x := x + 2;
+    x := x + 1;
 }
 
 procedure T2() {
-    x := x + 2;
+    x := x + 1;
 }

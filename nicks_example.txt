@@ -8,13 +8,6 @@ procedure T1() {
         x := 0;
         r := x;
     } else {}
-    r := 0;
-    r := 0;
-    r := 0;
-    r := 0;
-    r := 0;
-    r := 0;
-    r := 0;
 }
 
 procedure T2() {
