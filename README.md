@@ -1,5 +1,5 @@
 ### Tracee
-(TRansition Abstraction via Complete Existential Elimination)
+(TRansition Abstraction via Complete Existential Elimination)\
 Early-stage prototype of a concurrent-program verifier for a low level language.\
 Automates the Owicki-Gries proof directly, rather than operating on intermediate transition invariants.\
 Abstracts local variables out from interfering state transitions using existential quantification.
